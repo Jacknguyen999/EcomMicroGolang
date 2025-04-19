@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+  # Add a service to seed test data
+  recommender-test:
+    image: python:3.9-slim
+    depends_on:
+      - graphql
+      - recommender-server
+    volumes:
+      - ./test_recommender.py:/app/test_recommender.py
+    working_dir: /app
+    command: >
+      bash -c "
+        apt-get update && 
+        apt-get install -y curl jq && 
+        pip install requests colorama && 
+        echo 'Waiting for services to be ready...' &&
+        sleep 30 &&
+        python test_recommender.py
+      "
+    networks:
+      - default

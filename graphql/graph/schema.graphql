@@ -1,0 +1,94 @@
+scalar Time
+
+type Account {
+  id: String!
+  name: String!
+  email: String!
+  orders: [Order!]!
+}
+
+type Product {
+  id: String!
+  name: String!
+  description: String!
+  price: Float!
+  accountId: Int!
+}
+
+type Order {
+  id: String!
+  createdAt: Time!
+  totalPrice: Float!
+  products: [OrderedProduct!]!
+}
+
+type OrderedProduct {
+  id: String!
+  name: String!
+  description: String!
+  price: Float!
+  quantity: Int!
+}
+
+type AuthResponse {
+  token: String!
+}
+
+input PaginationInput {
+  skip: Int!
+  take: Int!
+}
+
+input RegisterInput {
+  name: String!
+  email: String!
+  password: String!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input CreateProductInput {
+  name: String!
+  description: String!
+  price: Float!
+}
+
+input UpdateProductInput {
+  id: String!
+  name: String!
+  description: String!
+  price: Float!
+}
+
+input OrderedProductInput {
+  id: String!
+  quantity: Int!
+}
+
+input OrderInput {
+  products: [OrderedProductInput]!
+}
+
+type Mutation {
+  register(account: RegisterInput!): AuthResponse
+  login(account: LoginInput!): AuthResponse
+  createProduct(product: CreateProductInput!): Product
+  updateProduct(product: UpdateProductInput!): Product
+  deleteProduct(id: String!): Boolean
+  createOrder(order: OrderInput!): Order
+}
+
+type Query {
+  accounts(pagination: PaginationInput, id: String): [Account!]!
+  product(
+    pagination: PaginationInput
+    query: String
+    id: String
+    viewedProductsIds: [String]
+    byAccountId: Boolean
+    ownedByMe: Boolean
+  ): [Product!]!
+}

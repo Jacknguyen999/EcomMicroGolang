@@ -1,0 +1,8 @@
+schema: graph/schema.graphql
+
+models:
+  Account:
+    model: github.com/rasadov/EcommerceAPI/graphql/graph.Account
+    fields:
+      orders:
+        resolver: true
