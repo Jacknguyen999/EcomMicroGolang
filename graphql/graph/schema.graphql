@@ -13,6 +13,7 @@ type Product {
   description: String!
   price: Float!
   accountId: Int!
+  category: String
 }
 
 type Order {
@@ -39,6 +40,18 @@ input PaginationInput {
   take: Int!
 }
 
+input PriceRangeInput {
+  min: Float
+  max: Float
+}
+
+enum SortOrder {
+  PRICE_ASC
+  PRICE_DESC
+  NEWEST
+  POPULARITY
+}
+
 input RegisterInput {
   name: String!
   email: String!
@@ -54,6 +67,7 @@ input CreateProductInput {
   name: String!
   description: String!
   price: Float!
+  category: String
 }
 
 input UpdateProductInput {
@@ -61,6 +75,7 @@ input UpdateProductInput {
   name: String!
   description: String!
   price: Float!
+  category: String
 }
 
 input OrderedProductInput {
@@ -90,5 +105,8 @@ type Query {
     viewedProductsIds: [String]
     byAccountId: Boolean
     ownedByMe: Boolean
+    priceRange: PriceRangeInput
+    category: String
+    sortBy: SortOrder
   ): [Product!]!
 }

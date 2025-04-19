@@ -53,12 +53,27 @@ type PaginationInput struct {
 	Take int `json:"take"`
 }
 
+type PriceRangeInput struct {
+	Min float64 `json:"min"`
+	Max float64 `json:"max"`
+}
+
+type SortOrder string
+
+const (
+	SortOrderPriceAsc   SortOrder = "PRICE_ASC"
+	SortOrderPriceDesc  SortOrder = "PRICE_DESC"
+	SortOrderNewest     SortOrder = "NEWEST"
+	SortOrderPopularity SortOrder = "POPULARITY"
+)
+
 type Product struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
 	Price       float64 `json:"price"`
 	AccountID   int     `json:"accountId"`
+	Category    string  `json:"category"`
 }
 
 type Query struct {

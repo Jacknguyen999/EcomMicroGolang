@@ -48,7 +48,7 @@ Below is a high-level overview of the system architecture:
 
   - `Account client` → `Account server` → `Postgres`
   - `Product client` → `Product server` → `ElasticSearch`
-  - `Order client` → `Order server` → `Postgres` + Kafka  
+  - `Order client` → `Order server` → `Postgres` + Kafka
     (also communicates with Product service via gRPC)
   - `Recommender client` → `Recommender server` (Python) → `Postgres (Replica)`
 
@@ -68,6 +68,7 @@ Below is a high-level overview of the system architecture:
 ### 📦 Product Service (Go)
 
 - Responsibilities: Product CRUD operations, indexing to Elasticsearch, event publishing to Kafka.
+- Features: Advanced filtering by price range and category, sorting by price and other criteria.
 - Database: Elasticsearch
 
 ### 🛒 Order Service (Go)
@@ -102,7 +103,7 @@ Before running the project, ensure you have the following installed:
 
 ```bash
   git clone https://github.com/Jacknguyen999/EcomMicroGolang.git
-  cd ecommercemicroservices
+  cd EcomMicroGolang
 ```
 
 ---
@@ -129,10 +130,10 @@ This will start:
 
 Once everything is running, open your browser to:
 
-- **GraphQL API endpoint**:  
+- **GraphQL API endpoint**:
   [http://localhost:8080/graphql](http://localhost:8080/graphql)
 
-- **GraphQL Playground (interactive testing)**:  
+- **GraphQL Playground (interactive testing)**:
   [http://localhost:8080/playground](http://localhost:8080/playground)
 
 ---
@@ -197,6 +198,110 @@ query {
     name
     price
   }
+}
+```
+
+### 🔍 Filter Products by Price Range
+
+```graphql
+query FilterProducts($priceRange: PriceRangeInput) {
+  product(pagination: { skip: 0, take: 10 }, priceRange: $priceRange) {
+    id
+    name
+    price
+  }
+}
+```
+
+Variables:
+
+```json
+{
+  "priceRange": {
+    "min": 50,
+    "max": 100
+  }
+}
+```
+
+### 🔍 Filter Products by Category
+
+```graphql
+query FilterProducts($category: String) {
+  product(pagination: { skip: 0, take: 10 }, category: $category) {
+    id
+    name
+    price
+  }
+}
+```
+
+Variables:
+
+```json
+{
+  "category": "electronics"
+}
+```
+
+### 🔍 Sort Products
+
+```graphql
+query FilterProducts($sortBy: SortOrder) {
+  product(pagination: { skip: 0, take: 10 }, sortBy: $sortBy) {
+    id
+    name
+    price
+  }
+}
+```
+
+Variables:
+
+```json
+{
+  "sortBy": "PRICE_ASC"
+}
+```
+
+Available sort orders:
+
+- `PRICE_ASC`: Sort by price, lowest to highest
+- `PRICE_DESC`: Sort by price, highest to lowest
+- `NEWEST`: Sort by newest first
+- `POPULARITY`: Sort by popularity (not implemented yet)
+
+### 🔍 Combine Filters and Sorting
+
+```graphql
+query FilterProducts(
+  $category: String
+  $priceRange: PriceRangeInput
+  $sortBy: SortOrder
+) {
+  product(
+    pagination: { skip: 0, take: 10 }
+    category: $category
+    priceRange: $priceRange
+    sortBy: $sortBy
+  ) {
+    id
+    name
+    price
+  }
+}
+```
+
+Variables:
+
+```json
+{
+  "category": "electronics",
+  "priceRange": {
+    "min": 50,
+    "max": 100
+  },
+  "sortBy": "PRICE_DESC"
 }
 ```
 

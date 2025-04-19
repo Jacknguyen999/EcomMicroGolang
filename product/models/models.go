@@ -6,6 +6,7 @@ type Product struct {
 	Description string  `json:"description"`
 	Price       float64 `json:"price"`
 	AccountID   int     `json:"accountID"`
+	Category    string  `json:"category"`
 }
 
 type ProductDocument struct {
@@ -13,6 +14,7 @@ type ProductDocument struct {
 	Description string  `json:"description"`
 	Price       float64 `json:"price"`
 	AccountID   int     `json:"accountID"`
+	Category    string  `json:"category"`
 }
 
 type EventData struct {
@@ -21,9 +23,15 @@ type EventData struct {
 	Description *string  `json:"description"`
 	Price       *float64 `json:"price"`
 	AccountID   *int     `json:"accountID"`
+	Category    *string  `json:"category"`
 }
 
 type Event struct {
 	Type string    `json:"type"`
 	Data EventData `json:"data"`
+}
+
+type PriceRange struct {
+	Min float64 `json:"min"`
+	Max float64 `json:"max"`
 }

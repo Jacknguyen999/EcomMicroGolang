@@ -21,7 +21,7 @@ type Repository interface {
 	GetProductById(ctx context.Context, id string) (*models.Product, error)
 	ListProducts(ctx context.Context, skip, take uint64) ([]models.Product, error)
 	ListProductsWithIDs(ctx context.Context, ids []string) ([]models.Product, error)
-	SearchProducts(ctx context.Context, query string, skip, take uint64) ([]models.Product, error)
+	SearchProducts(ctx context.Context, query string, skip, take uint64, priceRange *models.PriceRange, category string, sortOrder string) ([]models.Product, error)
 	UpdateProduct(ctx context.Context, updatedProduct models.Product) error
 	DeleteProduct(ctx context.Context, productId string) error
 }
@@ -54,6 +54,7 @@ func (r *elasticRepository) PutProduct(ctx context.Context, p *models.Product) e
 			Description: p.Description,
 			Price:       p.Price,
 			AccountID:   p.AccountID,
+			Category:    p.Category,
 		}).
 		Do(ctx)
 	if err != nil {
@@ -83,6 +84,7 @@ func (r *elasticRepository) GetProductById(ctx context.Context, id string) (*mod
 		Description: product.Description,
 		Price:       product.Price,
 		AccountID:   product.AccountID,
+		Category:    product.Category,
 	}, nil
 }
 
@@ -108,6 +110,7 @@ func (r *elasticRepository) ListProducts(ctx context.Context, skip, take uint64)
 				Description: product.Description,
 				Price:       product.Price,
 				AccountID:   product.AccountID,
+				Category:    product.Category,
 			})
 		}
 	}
@@ -140,24 +143,75 @@ func (r *elasticRepository) ListProductsWithIDs(ctx context.Context, ids []strin
 				Description: product.Description,
 				Price:       product.Price,
 				AccountID:   product.AccountID,
+				Category:    product.Category,
 			})
 		}
 	}
 	return products, err
 }
 
-func (r *elasticRepository) SearchProducts(ctx context.Context, query string, skip, take uint64) ([]models.Product, error) {
-	res, err := r.client.Search().
+func (r *elasticRepository) SearchProducts(ctx context.Context, query string, skip, take uint64, priceRange *models.PriceRange, category string, sortOrder string) ([]models.Product, error) {
+	// Build the query
+	boolQuery := elastic.NewBoolQuery()
+
+	// Add text search if provided
+	if query != "" {
+		textQuery := elastic.NewMultiMatchQuery(query, "name", "description")
+		boolQuery.Must(textQuery)
+	}
+
+	// Add price range filter if provided
+	if priceRange != nil {
+		priceFilter := elastic.NewRangeQuery("price")
+		if priceRange.Min > 0 {
+			priceFilter.Gte(priceRange.Min)
+		}
+		if priceRange.Max > 0 {
+			priceFilter.Lte(priceRange.Max)
+		}
+		boolQuery.Filter(priceFilter)
+	}
+
+	// Add category filter if provided
+	if category != "" {
+		categoryFilter := elastic.NewTermQuery("category", category)
+		boolQuery.Filter(categoryFilter)
+	}
+
+	// Create search service
+	search := r.client.Search().
 		Index("catalog").
 		Type("product").
-		Query(elastic.NewMultiMatchQuery(query, "name", "description")).
+		Query(boolQuery).
 		From(int(skip)).
-		Size(int(take)).
-		Do(ctx)
+		Size(int(take))
+
+	// Add sorting if provided
+	if sortOrder != "" {
+		switch sortOrder {
+		case "PRICE_ASC":
+			search = search.Sort("price", true)
+		case "PRICE_DESC":
+			search = search.Sort("price", false)
+		case "NEWEST":
+			// Assuming there's a timestamp field, which might not exist
+			// This is just a placeholder
+			search = search.Sort("_id", false) // Sort by ID as a proxy for creation time
+		case "POPULARITY":
+			// This would require additional data like view counts
+			// For now, we'll just use a default sort
+			search = search.Sort("_score", false)
+		}
+	}
+
+	// Execute the search
+	res, err := search.Do(ctx)
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
+
+	// Process results
 	var products []models.Product
 	for _, hit := range res.Hits.Hits {
 		product := models.ProductDocument{}
@@ -168,9 +222,11 @@ func (r *elasticRepository) SearchProducts(ctx context.Context, query string, sk
 				Description: product.Description,
 				Price:       product.Price,
 				AccountID:   product.AccountID,
+				Category:    product.Category,
 			})
 		}
 	}
+
 	return products, err
 }
 
@@ -184,6 +240,7 @@ func (r *elasticRepository) UpdateProduct(ctx context.Context, updatedProduct mo
 			Description: updatedProduct.Description,
 			Price:       updatedProduct.Price,
 			AccountID:   updatedProduct.AccountID,
+			Category:    updatedProduct.Category,
 		}).
 		Do(ctx)
 	return err

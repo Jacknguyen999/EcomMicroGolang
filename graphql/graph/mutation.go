@@ -73,7 +73,8 @@ func (resolver *mutationResolver) CreateProduct(ctx context.Context, in CreatePr
 	}
 
 	log.Println("CreateProduct called with accountId:", accountId)
-	postProduct, err := resolver.server.productClient.PostProduct(ctx, in.Name, in.Description, in.Price, int64(accountId))
+	// For now, we'll use an empty string for the category
+	postProduct, err := resolver.server.productClient.PostProduct(ctx, in.Name, in.Description, in.Price, int64(accountId), "")
 	if err != nil {
 		log.Println("Error creating product:", err)
 		return nil, err
@@ -88,6 +89,7 @@ func (resolver *mutationResolver) CreateProduct(ctx context.Context, in CreatePr
 		Description: postProduct.Description,
 		Price:       postProduct.Price,
 		AccountID:   accountId,
+		Category:    postProduct.Category,
 	}, nil
 }
 
@@ -102,7 +104,8 @@ func (resolver *mutationResolver) UpdateProduct(ctx context.Context, in UpdatePr
 		return nil, errors.New("unauthorized: you must be logged in to update a product")
 	}
 
-	updatedProduct, err := resolver.server.productClient.UpdateProduct(ctx, in.ID, in.Name, in.Description, in.Price, int64(accountId))
+	// For now, we'll use an empty string for the category
+	updatedProduct, err := resolver.server.productClient.UpdateProduct(ctx, in.ID, in.Name, in.Description, in.Price, int64(accountId), "")
 	if err != nil {
 		log.Println("Error updating product:", err)
 		return nil, err
@@ -114,6 +117,7 @@ func (resolver *mutationResolver) UpdateProduct(ctx context.Context, in UpdatePr
 		Description: updatedProduct.Description,
 		Price:       updatedProduct.Price,
 		AccountID:   accountId,
+		Category:    updatedProduct.Category,
 	}, nil
 }
 

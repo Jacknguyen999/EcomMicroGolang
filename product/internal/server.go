@@ -51,7 +51,8 @@ func (s *grpcServer) GetProducts(ctx context.Context, r *pb.GetProductsRequest) 
 	var res []models.Product
 	var err error
 	if r.Query != "" {
-		res, err = s.service.SearchProducts(ctx, r.Query, r.Skip, r.Take)
+		// Pass nil for priceRange, empty string for category and sortOrder
+		res, err = s.service.SearchProducts(ctx, r.Query, r.Skip, r.Take, nil, "", "")
 	} else if len(r.Ids) != 0 {
 		res, err = s.service.GetProductsWithIDs(ctx, r.Ids)
 	} else {
@@ -75,7 +76,8 @@ func (s *grpcServer) GetProducts(ctx context.Context, r *pb.GetProductsRequest) 
 }
 
 func (s *grpcServer) PostProduct(ctx context.Context, r *pb.CreateProductRequest) (*pb.ProductResponse, error) {
-	p, err := s.service.PostProduct(ctx, r.GetName(), r.GetDescription(), r.Price, int(r.GetAccountId()))
+	// For now, we'll use an empty string for the category
+	p, err := s.service.PostProduct(ctx, r.GetName(), r.GetDescription(), r.Price, int(r.GetAccountId()), "")
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -90,7 +92,8 @@ func (s *grpcServer) PostProduct(ctx context.Context, r *pb.CreateProductRequest
 }
 
 func (s *grpcServer) UpdateProduct(ctx context.Context, r *pb.UpdateProductRequest) (*pb.ProductResponse, error) {
-	p, err := s.service.UpdateProduct(ctx, r.GetId(), r.GetName(), r.GetDescription(), r.Price, int(r.GetAccountId()))
+	// For now, we'll use an empty string for the category
+	p, err := s.service.UpdateProduct(ctx, r.GetId(), r.GetName(), r.GetDescription(), r.Price, int(r.GetAccountId()), "")
 	if err != nil {
 		log.Println(err)
 		return nil, err

@@ -11,6 +11,7 @@ message Product {
   string description = 3;
   double price = 4;
   int64 accountId = 5;
+  string category = 6;
 }
 
 message CreateProductRequest {
@@ -18,6 +19,7 @@ message CreateProductRequest {
   string description = 2;
   double price = 3;
   int64  accountId = 4;
+  string category = 5;
 }
 
 message UpdateProductRequest {
@@ -26,6 +28,7 @@ message UpdateProductRequest {
   string description = 3;
   double price = 4;
   int64 accountId = 5;
+  string category = 6;
 }
 
 message DeleteProductRequest {

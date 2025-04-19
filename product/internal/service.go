@@ -12,12 +12,12 @@ import (
 )
 
 type Service interface {
-	PostProduct(ctx context.Context, name, description string, price float64, accountId int) (*models.Product, error)
+	PostProduct(ctx context.Context, name, description string, price float64, accountId int, category string) (*models.Product, error)
 	GetProduct(ctx context.Context, id string) (*models.Product, error)
 	GetProducts(ctx context.Context, skip, take uint64) ([]models.Product, error)
 	GetProductsWithIDs(ctx context.Context, ids []string) ([]models.Product, error)
-	SearchProducts(ctx context.Context, query string, skip, take uint64) ([]models.Product, error)
-	UpdateProduct(ctx context.Context, id, name, description string, price float64, accountId int) (*models.Product, error)
+	SearchProducts(ctx context.Context, query string, skip, take uint64, priceRange *models.PriceRange, category string, sortOrder string) ([]models.Product, error)
+	UpdateProduct(ctx context.Context, id, name, description string, price float64, accountId int, category string) (*models.Product, error)
 	DeleteProduct(ctx context.Context, productId string, accountId int) error
 	Producer() sarama.AsyncProducer
 }
@@ -35,12 +35,13 @@ func (service productService) Producer() sarama.AsyncProducer {
 	return service.producer
 }
 
-func (service productService) PostProduct(ctx context.Context, name, description string, price float64, accountId int) (*models.Product, error) {
+func (service productService) PostProduct(ctx context.Context, name, description string, price float64, accountId int, category string) (*models.Product, error) {
 	product := models.Product{
 		Name:        name,
 		Description: description,
 		Price:       price,
 		AccountID:   accountId,
+		Category:    category,
 	}
 
 	err := service.repo.PutProduct(ctx, &product)
@@ -97,11 +98,11 @@ func (service productService) GetProductsWithIDs(ctx context.Context, ids []stri
 	return service.repo.ListProductsWithIDs(ctx, ids)
 }
 
-func (service productService) SearchProducts(ctx context.Context, query string, skip, take uint64) ([]models.Product, error) {
-	return service.repo.SearchProducts(ctx, query, skip, take)
+func (service productService) SearchProducts(ctx context.Context, query string, skip, take uint64, priceRange *models.PriceRange, category string, sortOrder string) ([]models.Product, error) {
+	return service.repo.SearchProducts(ctx, query, skip, take, priceRange, category, sortOrder)
 }
 
-func (service productService) UpdateProduct(ctx context.Context, id, name, description string, price float64, accountId int) (*models.Product, error) {
+func (service productService) UpdateProduct(ctx context.Context, id, name, description string, price float64, accountId int, category string) (*models.Product, error) {
 	product, err := service.repo.GetProductById(ctx, id)
 	if err != nil {
 		return nil, err
@@ -116,6 +117,7 @@ func (service productService) UpdateProduct(ctx context.Context, id, name, descr
 		Description: description,
 		Price:       price,
 		AccountID:   accountId,
+		Category:    category,
 	}
 	err = service.repo.UpdateProduct(ctx, updatedProduct)
 	if err != nil {
