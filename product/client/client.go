@@ -3,6 +3,8 @@ package client
 import (
 	"context"
 	"log"
+	"sort"
+	"strings"
 
 	"google.golang.org/grpc"
 
@@ -127,110 +129,122 @@ func (client *Client) DeleteProduct(ctx context.Context, productId string, accou
 }
 
 func (client *Client) SearchProducts(ctx context.Context, query string, skip, take uint64, priceRange *models.PriceRange, category string, sortOrder string) ([]models.Product, error) {
-	// For now, we'll use the existing GetProducts method and filter the results in the GraphQL resolver
-	// In a real implementation, you would update the product service to support these filters
-	res, err := client.service.GetProducts(ctx, &pb.GetProductsRequest{
-		Skip:  skip,
-		Take:  take,
-		Query: query,
-	})
+	// Use the repository's direct search capabilities
+	log.Printf("Searching products with query=%s, priceRange=%v, category=%s, sortOrder=%s", query, priceRange, category, sortOrder)
+
+	// Get all products first to ensure we have the most up-to-date data
+	allProducts, err := client.GetProducts(ctx, 0, 1000, nil, "")
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert the results to models.Product
-	var products []models.Product
-	for _, p := range res.Products {
-		products = append(products, models.Product{
-			ID:          p.Id,
-			Name:        p.Name,
-			Description: p.Description,
-			Price:       p.Price,
-			AccountID:   int(p.AccountId),
-			// Category is not available in the current implementation
-			Category:    category,
-		})
-	}
+	log.Printf("Found %d total products in the database", len(allProducts))
 
-	// Apply client-side filtering for price range
-	if priceRange != nil {
-		log.Printf("Applying price range filter: Min=%v, Max=%v", priceRange.Min, priceRange.Max)
-		log.Printf("Before filtering: %d products", len(products))
-		var filteredProducts []models.Product
-		for _, product := range products {
-			if (priceRange.Min <= 0 || product.Price >= priceRange.Min) &&
-			   (priceRange.Max <= 0 || product.Price <= priceRange.Max) {
+	// Apply filtering manually to ensure we include all products
+	var filteredProducts []models.Product
+
+	// Filter by query (name/description)
+	if query != "" {
+		for _, product := range allProducts {
+			// Simple case-insensitive substring search
+			if strings.Contains(strings.ToLower(product.Name), strings.ToLower(query)) ||
+			   strings.Contains(strings.ToLower(product.Description), strings.ToLower(query)) {
 				filteredProducts = append(filteredProducts, product)
-				log.Printf("Product %s with price %.2f passes filter", product.Name, product.Price)
-			} else {
-				log.Printf("Product %s with price %.2f filtered out", product.Name, product.Price)
 			}
 		}
-		log.Printf("After filtering: %d products", len(filteredProducts))
-		products = filteredProducts
+	} else {
+		// If no query, include all products
+		filteredProducts = allProducts
 	}
 
-	// Apply client-side filtering for category
+	// Apply price range filtering
+	if priceRange != nil && (priceRange.Min > 0 || priceRange.Max > 0) {
+		log.Printf("Applying price range filter: Min=%v, Max=%v", priceRange.Min, priceRange.Max)
+		var priceFilteredProducts []models.Product
+
+		for _, product := range filteredProducts {
+			passesFilter := true
+
+			// Apply minimum price filter if set
+			if priceRange.Min > 0 && product.Price < priceRange.Min {
+				passesFilter = false
+			}
+
+			// Apply maximum price filter if set
+			if priceRange.Max > 0 && product.Price > priceRange.Max {
+				passesFilter = false
+			}
+
+			if passesFilter {
+				priceFilteredProducts = append(priceFilteredProducts, product)
+				log.Printf("Product %s with price %.2f passes price filter", product.Name, product.Price)
+			} else {
+				log.Printf("Product %s with price %.2f filtered out by price", product.Name, product.Price)
+			}
+		}
+
+		filteredProducts = priceFilteredProducts
+		log.Printf("After price filtering: %d products", len(filteredProducts))
+	}
+
+	// Apply category filtering
 	if category != "" {
 		log.Printf("Applying category filter: %s", category)
-		log.Printf("Before filtering: %d products", len(products))
-		var filteredProducts []models.Product
-		for _, product := range products {
-			log.Printf("Product %s has category '%s'", product.Name, product.Category)
+		var categoryFilteredProducts []models.Product
+
+		for _, product := range filteredProducts {
 			if product.Category == category {
-				filteredProducts = append(filteredProducts, product)
+				categoryFilteredProducts = append(categoryFilteredProducts, product)
 				log.Printf("Product %s passes category filter", product.Name)
 			} else {
 				log.Printf("Product %s filtered out by category", product.Name)
 			}
 		}
-		log.Printf("After filtering: %d products", len(filteredProducts))
-		products = filteredProducts
+
+		filteredProducts = categoryFilteredProducts
+		log.Printf("After category filtering: %d products", len(filteredProducts))
 	}
 
-	// Implement sorting
+	// Apply sorting
 	if sortOrder != "" {
 		log.Printf("Applying sort order: %s", sortOrder)
-		log.Printf("Before sorting: %v", products)
 
 		switch sortOrder {
 		case "PRICE_ASC":
-			log.Printf("Sorting by price ascending")
-			// Sort by price ascending
-			for i := 0; i < len(products)-1; i++ {
-				for j := i + 1; j < len(products); j++ {
-					if products[i].Price > products[j].Price {
-						products[i], products[j] = products[j], products[i]
-					}
-				}
-			}
+			sort.Slice(filteredProducts, func(i, j int) bool {
+				return filteredProducts[i].Price < filteredProducts[j].Price
+			})
+			log.Printf("Sorted products by price ascending")
+
 		case "PRICE_DESC":
-			log.Printf("Sorting by price descending")
-			// Sort by price descending
-			for i := 0; i < len(products)-1; i++ {
-				for j := i + 1; j < len(products); j++ {
-					if products[i].Price < products[j].Price {
-						products[i], products[j] = products[j], products[i]
-					}
-				}
-			}
+			sort.Slice(filteredProducts, func(i, j int) bool {
+				return filteredProducts[i].Price > filteredProducts[j].Price
+			})
+			log.Printf("Sorted products by price descending")
+
 		case "NEWEST":
-			log.Printf("Sorting by newest (ID as proxy)")
-			// Sort by ID as a proxy for creation time (newest first)
-			for i := 0; i < len(products)-1; i++ {
-				for j := i + 1; j < len(products); j++ {
-					if products[i].ID < products[j].ID {
-						products[i], products[j] = products[j], products[i]
-					}
-				}
-			}
+			sort.Slice(filteredProducts, func(i, j int) bool {
+				return filteredProducts[i].ID > filteredProducts[j].ID
+			})
+			log.Printf("Sorted products by newest first")
+
 		case "POPULARITY":
-			// This would require additional data, for now we'll just log it
 			log.Printf("Sorting by popularity not implemented")
 		}
-
-		log.Printf("After sorting: %v", products)
 	}
 
-	return products, nil
+	// Apply pagination
+	start := int(skip)
+	end := int(skip + take)
+
+	if start >= len(filteredProducts) {
+		return []models.Product{}, nil
+	}
+
+	if end > len(filteredProducts) {
+		end = len(filteredProducts)
+	}
+
+	log.Printf("Returning products %d to %d (total: %d)", start, end, len(filteredProducts))
+	return filteredProducts[start:end], nil
 }

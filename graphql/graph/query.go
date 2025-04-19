@@ -4,13 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"log"
-	"net/http"
-	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -342,12 +337,25 @@ func (resolver *queryResolver) Product(
 
 	// Category and sort order are handled directly in the resolver
 
-	// Call product service with basic search
-	productList, err := resolver.server.productClient.GetProducts(ctx, skip, take, nil, q)
+	// Call product service with advanced search including filters
+	var categoryStr string
+	if category != nil {
+		categoryStr = *category
+	}
+
+	var sortOrderStr string
+	if sortBy != nil {
+		sortOrderStr = string(*sortBy)
+	}
+
+	log.Printf("Searching products with query=%s, priceRange=%v, category=%s, sortOrder=%s", q, productPriceRange, categoryStr, sortOrderStr)
+	productList, err := resolver.server.productClient.SearchProducts(ctx, q, skip, take, productPriceRange, categoryStr, sortOrderStr)
 	if err != nil {
 		log.Println("Error searching products:", err)
 		return nil, err
 	}
+
+	log.Printf("Search returned %d products", len(productList))
 
 	// Convert to GraphQL products
 	var products []*Product
@@ -364,112 +372,7 @@ func (resolver *queryResolver) Product(
 		)
 	}
 
-	// Apply price range filtering directly in the resolver
-	if priceRange != nil {
-		log.Printf("Applying price range filter: Min=%v, Max=%v", priceRange.Min, priceRange.Max)
-		var filteredProducts []*Product
-		for _, product := range products {
-			if (priceRange.Min <= 0 || product.Price >= priceRange.Min) &&
-			   (priceRange.Max <= 0 || product.Price <= priceRange.Max) {
-				filteredProducts = append(filteredProducts, product)
-			}
-		}
-		products = filteredProducts
-	}
-
-	// Apply category filtering
-	if category != nil && *category != "" {
-		log.Printf("Applying category filter: %s", *category)
-
-		// Try to directly query Elasticsearch for products with the specified category
-		query := fmt.Sprintf(`{"query": {"term": {"category": "%s"}}}`, *category)
-
-		// Make a direct HTTP request to Elasticsearch
-		resp, err := http.Post("http://product_db:9200/catalog/product/_search", "application/json", strings.NewReader(query))
-		if err != nil {
-			log.Printf("Error querying Elasticsearch: %v", err)
-		} else {
-			defer resp.Body.Close()
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				log.Printf("Error reading Elasticsearch response: %v", err)
-			} else {
-				// Parse the response
-				var result map[string]interface{}
-				if err := json.Unmarshal(body, &result); err != nil {
-					log.Printf("Error parsing Elasticsearch response: %v", err)
-				} else {
-					// Extract the hits
-					if hits, ok := result["hits"].(map[string]interface{}); ok {
-						if hitsArray, ok := hits["hits"].([]interface{}); ok {
-							log.Printf("Found %d products with category '%s'", len(hitsArray), *category)
-
-							// Create a new products array
-							var filteredProducts []*Product
-
-							// Add products from Elasticsearch
-							for _, hit := range hitsArray {
-								hitMap := hit.(map[string]interface{})
-								id := hitMap["_id"].(string)
-								source := hitMap["_source"].(map[string]interface{})
-
-								name := source["name"].(string)
-								description := source["description"].(string)
-								price := source["price"].(float64)
-								accountID := int(source["accountID"].(float64))
-								category := source["category"].(string)
-
-								filteredProducts = append(filteredProducts, &Product{
-									ID:          id,
-									Name:        name,
-									Description: description,
-									Price:       price,
-									AccountID:   accountID,
-									Category:    category,
-								})
-							}
-
-							products = filteredProducts
-							return products, nil
-						}
-					}
-				}
-			}
-		}
-
-		// Fall back to client-side filtering if Elasticsearch query fails
-		var filteredProducts []*Product
-		for _, product := range products {
-			if product.Category == *category {
-				filteredProducts = append(filteredProducts, product)
-			}
-		}
-		products = filteredProducts
-	}
-
-	// Apply sorting
-	if sortBy != nil {
-		log.Printf("Applying sort order: %s", *sortBy)
-
-		switch *sortBy {
-		case SortOrderPriceAsc:
-			// Use sort.Slice for more reliable sorting
-			sort.Slice(products, func(i, j int) bool {
-				return products[i].Price < products[j].Price
-			})
-		case SortOrderPriceDesc:
-			sort.Slice(products, func(i, j int) bool {
-				return products[i].Price > products[j].Price
-			})
-		case SortOrderNewest:
-			sort.Slice(products, func(i, j int) bool {
-				return products[i].ID > products[j].ID
-			})
-		case SortOrderPopularity:
-			// This would require additional data, for now we'll just log it
-			log.Printf("Sorting by popularity not implemented")
-		}
-	}
+	// Price range filtering, category filtering, and sorting are now handled by the SearchProducts method
 
 	return products, nil
 }

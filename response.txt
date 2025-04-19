@@ -1,0 +1,1 @@
+{"data":{"createProduct":{"id":"Vu8DT5YBsnCQbh8YAYAj","name":"Gaming Keyboard RGB","description":"Mechanical gaming keyboard with RGB lighting","price":89.99,"category":"electronics"}}}
